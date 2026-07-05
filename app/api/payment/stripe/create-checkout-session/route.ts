@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 import { getAppBaseUrl, getStripe, toStripeAmount } from '@/lib/stripe';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const clientId = getClientIdentifier(req);

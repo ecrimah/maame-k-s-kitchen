@@ -18,6 +18,7 @@ import {
   isProductAvailableToday,
   getProductVideos,
   formatPreorderNotice,
+  offersProteinChoice,
 } from '@/lib/product-availability';
 import { embedVideoUrl, isEmbeddableStream } from '@/lib/video-embed';
 
@@ -29,6 +30,8 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [proteins, setProteins] = useState<any[]>([]);
+  const [selectedProtein, setSelectedProtein] = useState<any>(null);
   const [orderNotes, setOrderNotes] = useState('');
 
 
@@ -160,20 +163,51 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
     }
   }, [slug]);
 
+  useEffect(() => {
+    if (!product || !offersProteinChoice(product)) {
+      setProteins([]);
+      setSelectedProtein(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await cachedQuery<{ data: any; error: any }>(
+        'proteins:active',
+        (() => supabase
+          .from('proteins')
+          .select('id, name, description, price_delta, image_url')
+          .eq('is_active', true)
+          .order('position', { ascending: true })
+          .order('name', { ascending: true })) as any,
+        2 * 60 * 1000
+      );
+      if (!cancelled && data) setProteins(data);
+    })();
+    return () => { cancelled = true; };
+  }, [product]);
+
   const hasVariants = product?.variants?.length > 0;
+  const offersProtein = product ? offersProteinChoice(product) && proteins.length > 0 : false;
+  const needsProteinSelection = offersProtein && !selectedProtein;
 
   const needsVariantSelection = hasVariants && !selectedVariant;
+  const needsSelection = needsVariantSelection || needsProteinSelection;
 
 
-  // Determine the active price: variant price if selected, otherwise base price
-  const activePrice = selectedVariant?.price ?? product?.price ?? 0;
+  // Determine the active price: variant price if selected, otherwise base price,
+  // plus any extra charge for the chosen protein.
+  const basePrice = selectedVariant?.price ?? product?.price ?? 0;
+  const proteinDelta = selectedProtein ? Number(selectedProtein.price_delta) || 0 : 0;
+  const activePrice = basePrice + proteinDelta;
   const isAvailable = product?.inStock !== false;
 
   const handleAddToCart = () => {
     if (!product) return;
-    if (needsVariantSelection) return; // Safety check
+    if (needsSelection) return; // Safety check
 
-    const variantLabel = selectedVariant?.name || undefined;
+    const variantLabel = [selectedVariant?.name, selectedProtein?.name]
+      .filter(Boolean)
+      .join(' · ') || undefined;
 
     addToCart({
       id: product.id,
@@ -501,6 +535,42 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                   return null;
                 })()}
 
+                {offersProtein && (
+                  <div className="mb-8">
+                    <label className="block text-sm font-medium text-gray-900 mb-3 tracking-wide">
+                      Choose your protein: {selectedProtein ? (
+                        <span className="text-gray-500 font-normal ml-1">{selectedProtein.name}</span>
+                      ) : (
+                        <span className="text-[#C8952A] font-normal text-xs ml-1">Please select</span>
+                      )}
+                    </label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {proteins.map((protein: any) => {
+                        const isSelected = selectedProtein?.id === protein.id;
+                        const delta = Number(protein.price_delta) || 0;
+                        return (
+                          <button
+                            key={protein.id}
+                            onClick={() => setSelectedProtein(protein)}
+                            disabled={!isAvailable}
+                            className={`px-5 py-2.5 rounded-xl border font-medium transition-all whitespace-nowrap cursor-pointer flex flex-col items-center min-w-[5rem] ${isSelected
+                              ? 'border-gray-900 ring-1 ring-gray-900/10 bg-white text-gray-900 shadow-sm'
+                              : !isAvailable
+                                ? 'border-gray-100 text-gray-300 cursor-not-allowed bg-gray-50/50'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50/50'
+                              }`}
+                          >
+                            <span className="text-[14px]">{protein.name}</span>
+                            <span className={`text-[11px] mt-0.5 ${isSelected ? 'text-gray-500' : 'text-gray-400'}`}>
+                              {delta > 0 ? `+$${delta.toFixed(2)}` : 'No extra'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mb-10">
                   <label className="block text-sm font-medium text-gray-900 mb-3 tracking-wide">Quantity</label>
                   <div className="flex items-center space-x-5">
@@ -573,15 +643,15 @@ export default function ProductDetailClient({ slug }: { slug: string }) {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3.5 mb-10">
                   <button
-                    disabled={!isAvailable || needsVariantSelection}
-                    className={`flex-1 group relative overflow-hidden bg-[#111111] text-white py-4 px-6 rounded-xl font-medium transition-all duration-500 flex items-center justify-center space-x-2.5 text-[15px] shadow-[0_4px_14px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 whitespace-nowrap cursor-pointer ${(!isAvailable || needsVariantSelection) ? 'opacity-50 cursor-not-allowed hover:-translate-y-0' : ''}`}
+                    disabled={!isAvailable || needsSelection}
+                    className={`flex-1 group relative overflow-hidden bg-[#111111] text-white py-4 px-6 rounded-xl font-medium transition-all duration-500 flex items-center justify-center space-x-2.5 text-[15px] shadow-[0_4px_14px_rgba(0,0,0,0.1)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.15)] hover:-translate-y-0.5 whitespace-nowrap cursor-pointer ${(!isAvailable || needsSelection) ? 'opacity-50 cursor-not-allowed hover:-translate-y-0' : ''}`}
                     onClick={handleAddToCart}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
                     <i className="ri-shopping-cart-2-line text-lg relative z-10"></i>
-                    <span className="relative z-10 tracking-wide">{!isAvailable ? 'Unavailable' : needsVariantSelection ? 'Select a Portion' : 'Add to Order'}</span>
+                    <span className="relative z-10 tracking-wide">{!isAvailable ? 'Unavailable' : needsVariantSelection ? 'Select a Portion' : needsProteinSelection ? 'Choose a Protein' : 'Add to Order'}</span>
                   </button>
-                  {isAvailable && !needsVariantSelection  && (
+                  {isAvailable && !needsSelection  && (
                     <button
                       onClick={handleBuyNow}
                       className="sm:w-[160px] bg-white border border-black/[0.06] hover:border-black/[0.12] hover:bg-gray-50 text-gray-900 py-4 rounded-xl font-medium transition-all duration-300 whitespace-nowrap cursor-pointer shadow-sm tracking-wide"

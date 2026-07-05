@@ -100,7 +100,9 @@ export default function CheckoutPage() {
 
   // Calculate Totals
   const subtotal = cartSubtotal;
-  const deliveryFee = deliveryMethod === 'pickup' ? 0 : 5;
+  // Doorstep delivery cost is quoted separately (admin contacts the customer),
+  // so nothing is added to the checkout total for either option.
+  const deliveryFee = 0;
   const tax = 0; // No Tax
   const couponDiscount = appliedCoupon
     ? calculateCouponDiscount(subtotal, appliedCoupon, deliveryFee)
