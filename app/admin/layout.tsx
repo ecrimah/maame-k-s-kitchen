@@ -173,6 +173,11 @@ export default function AdminLayout({
       path: '/admin/saturday-menu'
     },
     {
+      title: 'Proteins',
+      icon: 'ri-restaurant-2-line',
+      path: '/admin/proteins'
+    },
+    {
       title: 'Categories',
       icon: 'ri-folder-line',
       path: '/admin/categories'

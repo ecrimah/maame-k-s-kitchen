@@ -65,6 +65,12 @@ export function getProductVideos(product: {
   return [...new Set([...fromMeta, ...fromImages])];
 }
 
+export function offersProteinChoice(product: {
+  metadata?: { offers_protein?: boolean } | null;
+}): boolean {
+  return product.metadata?.offers_protein === true;
+}
+
 export function formatPreorderNotice(hours: number): string {
   if (hours >= 24 && hours % 24 === 0) {
     const days = hours / 24;

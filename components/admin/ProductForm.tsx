@@ -100,6 +100,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
   const [keywords, setKeywords] = useState(initialData?.metadata?.keywords || '');
   const [focusKeyword, setFocusKeyword] = useState(initialData?.metadata?.focus_keyword || '');
   const [noindex, setNoindex] = useState<boolean>(initialData?.metadata?.noindex ?? false);
+  const [offersProtein, setOffersProtein] = useState<boolean>(initialData?.metadata?.offers_protein ?? false);
 
   useEffect(() => { supabase.from('categories').select('id, name').then(({ data }) => { if (data) setCategories(data); }); }, []);
   useEffect(() => { if (!isEditMode && dishName) setSlug(dishName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')); }, [dishName, isEditMode]);
@@ -208,6 +209,7 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
           keywords,
           focus_keyword: focusKeyword,
           noindex,
+          offers_protein: offersProtein,
           availability_mode: dishAvailability === 'preorder' ? 'preorder' : 'standard',
           preorder_lead_hours: dishAvailability === 'preorder' ? parseInt(preorderLeadHours) || 24 : null,
           available_days: saturdayOnly ? ['saturday'] : [],
@@ -452,6 +454,27 @@ export default function ProductForm({ initialData, isEditMode = false }: Product
                       <i className={`${icon} text-xl`}></i><span className="text-xs font-semibold">{label}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className="p-5 border-2 border-gray-200 rounded-xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 mb-1">Protein Choice</h3>
+                    <p className="text-sm text-gray-600">
+                      {offersProtein
+                        ? 'Customers will pick a protein (Chicken, Beef, etc.) for this dish before ordering.'
+                        : 'Turn on to let customers pick a protein for this dish.'}
+                      {' '}Manage the protein list under <strong>Proteins</strong> in the sidebar.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOffersProtein(!offersProtein)}
+                    className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors cursor-pointer ${offersProtein ? 'bg-[#C8952A]' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${offersProtein ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
               </div>
 
