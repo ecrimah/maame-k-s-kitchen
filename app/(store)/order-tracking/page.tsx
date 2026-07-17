@@ -270,8 +270,11 @@ function OrderTrackingContent() {
   const statusBadge = getStatusBadge();
   const trackingNumber = order.metadata?.tracking_number || '';
   const shippingAddress = order.shipping_address || {};
-  const estimatedDelivery = new Date(new Date(order.created_at).getTime() + 7 * 24 * 60 * 60 * 1000)
-    .toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const scheduledDateRaw = order.estimated_delivery_at || (order.metadata?.preferred_date ? order.metadata.preferred_date + 'T12:00:00' : null);
+  const scheduledDate = scheduledDateRaw
+    ? new Date(scheduledDateRaw).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
+  const isPickup = order.delivery_type === 'pickup' || order.shipping_method === 'pickup';
 
   return (
     <main className="min-h-screen bg-gray-50 py-12 px-4">
@@ -296,7 +299,13 @@ function OrderTrackingContent() {
                   <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-sm">{trackingNumber}</span>
                 </p>
               )}
-              <p className="text-gray-500 text-sm mt-1">Same-day delivery &middot; Cornerstone, NE Calgary</p>
+              {scheduledDate ? (
+                <p className="text-gray-500 text-sm mt-1">
+                  {isPickup ? 'Pickup' : 'Delivery'} scheduled for <span className="font-semibold text-gray-700">{scheduledDate}</span> &middot; Cornerstone, NE Calgary
+                </p>
+              ) : (
+                <p className="text-gray-500 text-sm mt-1">Cornerstone, NE Calgary</p>
+              )}
             </div>
             <div className={`px-4 py-2 rounded-full font-semibold whitespace-nowrap ${statusBadge.color}`}>
               {statusBadge.label}

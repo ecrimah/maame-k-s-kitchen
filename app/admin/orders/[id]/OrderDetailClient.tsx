@@ -335,6 +335,12 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
           <div className="flex justify-between mb-6">
             <div>
               <p><span className="font-semibold">Delivery Method:</span> {order?.delivery_type || 'Standard'}</p>
+              {(order?.estimated_delivery_at || order?.metadata?.preferred_date) && (
+                <p>
+                  <span className="font-semibold">Requested Date:</span>{' '}
+                  {new Date(order?.estimated_delivery_at || order?.metadata?.preferred_date + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
+              )}
               <p><span className="font-semibold">Payment:</span> {order?.payment_method} ({order?.payment_status})</p>
               {trackingNumber && <p><span className="font-semibold">Tracking #:</span> {trackingNumber}</p>}
             </div>

@@ -121,7 +121,11 @@ function OrderSuccessContent() {
   }
 
   const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-  const estimatedDelivery = new Date(new Date(order.created_at).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const scheduledDateRaw = order.estimated_delivery_at || (order.metadata?.preferred_date ? order.metadata.preferred_date + 'T12:00:00' : null);
+  const estimatedDelivery = scheduledDateRaw
+    ? new Date(scheduledDateRaw).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : 'We will confirm with you shortly';
+  const isPickup = order.delivery_type === 'pickup' || order.shipping_method === 'pickup';
   const pointsEarned = Math.floor(order.total / 10); // Example logic: 1 point per 10 currency units
 
   return (
@@ -168,7 +172,7 @@ function OrderSuccessContent() {
                   <p className="text-lg font-bold text-gray-900">{orderDate}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Estimated Delivery</p>
+                  <p className="text-sm text-gray-600 mb-1">{isPickup ? 'Pickup Date' : 'Delivery Date'}</p>
                   <p className="text-lg font-bold text-[#C8952A]">{estimatedDelivery}</p>
                 </div>
               </div>

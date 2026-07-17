@@ -59,6 +59,7 @@ export default function CheckoutPage() {
   const CANADA_PROVINCES = Object.keys(CANADA_CITIES).sort();
 
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
+  const [preferredDate, setPreferredDate] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('stripe');
   const [errors, setErrors] = useState<any>({});
@@ -127,6 +128,30 @@ export default function CheckoutPage() {
           .join(' ')
       : undefined;
 
+  // Earliest date the customer can choose: at least 24h out (pickup prep time),
+  // extended by the longest preorder lead time in the cart.
+  const minLeadHours = Math.max(24, maxPreorderHours);
+  const minSelectableDate = new Date(Date.now() + minLeadHours * 60 * 60 * 1000);
+  const minDateString = (() => {
+    const y = minSelectableDate.getFullYear();
+    const m = String(minSelectableDate.getMonth() + 1).padStart(2, '0');
+    const d = String(minSelectableDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  })();
+
+  const validatePreferredDate = (): string | null => {
+    if (!preferredDate) return 'Please choose your preferred date';
+    const chosen = new Date(preferredDate + 'T12:00:00');
+    if (isNaN(chosen.getTime())) return 'Invalid date';
+    if (preferredDate < minDateString) {
+      return `The earliest available date is ${new Date(minDateString + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+    }
+    if (hasSaturdayOnly && chosen.getDay() !== 6) {
+      return 'Your cart contains Saturday-menu items — please choose a Saturday';
+    }
+    return null;
+  };
+
   const validateShipping = () => {
     const newErrors: any = {};
     if (!shippingData.firstName) newErrors.firstName = 'First name is required';
@@ -149,6 +174,12 @@ export default function CheckoutPage() {
   };
 
   const handleContinueToPayment = async () => {
+    const dateError = validatePreferredDate();
+    if (dateError) {
+      setErrors((prev: any) => ({ ...prev, preferredDate: dateError }));
+      return;
+    }
+    setErrors((prev: any) => ({ ...prev, preferredDate: undefined }));
     // Proceed directly to Stripe checkout from step 2
     await handlePlaceOrder();
   };
@@ -206,6 +237,7 @@ export default function CheckoutPage() {
           total: total,
           shipping_method: deliveryMethod,
           delivery_type: deliveryMethod === 'doorstep' ? 'delivery' : 'pickup',
+          estimated_delivery_at: preferredDate ? new Date(preferredDate + 'T12:00:00').toISOString() : null,
           payment_method: paymentMethod,
           shipping_address: addressJson,
           billing_address: addressJson,
@@ -216,6 +248,7 @@ export default function CheckoutPage() {
             last_name: shippingData.lastName,
             tracking_number: trackingNumber,
             delivery_method: deliveryMethod,
+            preferred_date: preferredDate || null,
             ...(preorderCartItems.length > 0 && {
               preorder_items: preorderCartItems.map((item) => ({
                 name: item.name,
@@ -640,6 +673,28 @@ export default function CheckoutPage() {
 
                     {/* Additional delivery options can be added here.
                         Customize zones, fees, and labels for the regions you ship to. */}
+                  </div>
+
+                  <div className="mt-6">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Preferred {deliveryMethod === 'doorstep' ? 'Delivery' : 'Pickup'} Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={preferredDate}
+                      min={minDateString}
+                      onChange={(e) => {
+                        setPreferredDate(e.target.value);
+                        setErrors((prev: any) => ({ ...prev, preferredDate: undefined }));
+                      }}
+                      className={`w-full px-4 py-3 border-2 rounded-lg focus:ring-2 focus:ring-[#C8952A] focus:border-[#C8952A] bg-white ${errors.preferredDate ? 'border-[#C8952A]' : 'border-gray-300'}`}
+                    />
+                    {errors.preferredDate && <p className="text-sm text-[#C8952A] mt-1">{errors.preferredDate}</p>}
+                    <p className="text-sm text-gray-600 mt-2">
+                      {hasSaturdayOnly
+                        ? 'Your cart includes Saturday-menu items, so please pick a Saturday.'
+                        : `Earliest available: ${new Date(minDateString + 'T12:00:00').toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}. We need at least ${minLeadHours} hours to prepare your order.`}
+                    </p>
                   </div>
 
                   <div className="flex flex-col-reverse md:flex-row gap-4 mt-6">
