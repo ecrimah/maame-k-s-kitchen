@@ -55,3 +55,9 @@ supabase/.temp/
 supabase/.branches/
 
 .vercel
+
+migration-artifacts/dumps/
+
+migration-artifacts/storage/
+
+.env.staging
