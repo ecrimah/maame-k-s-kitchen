@@ -80,7 +80,7 @@ export default function Home() {
       <section className="relative w-full h-[65svh] sm:h-[100svh] min-h-[480px] sm:min-h-[600px] overflow-hidden bg-[#0a0a0a] flex flex-col">
 
         {/* ── Slide backgrounds ── */}
-        {['/home_hero_1.jpeg', '/home_hero_2.jpeg', '/home_hero_3.jpeg'].map((src, idx) => (
+        {['/home_hero_1.webp', '/home_hero_2.webp', '/home_hero_3.webp'].map((src, idx) => (
           <div
             key={src}
             className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === currentSlide ? 'opacity-100' : 'opacity-0'}`}
@@ -92,7 +92,7 @@ export default function Home() {
               className="object-cover object-center"
               priority={idx === 0}
               sizes="100vw"
-              quality={88}
+              quality={80}
             />
           </div>
         ))}

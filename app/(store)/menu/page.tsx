@@ -195,7 +195,7 @@ function ShopContent() {
       <PageHero
         title="Our Menu"
         subtitle="Authentic Ghanaian cuisine made fresh daily — banku, jollof, waakye, fufu, omotuo, soups, stews & traditional sides"
-        backgroundImage="/home_hero_1.jpeg"
+        backgroundImage="/home_hero_1.webp"
       />
 
       {/* Quick category links — sit below hero (no negative margin; avoids hero clipping tabs) */}

@@ -84,7 +84,7 @@ export default function Footer() {
             <div className="lg:col-span-4 space-y-4 lg:pr-8">
               <Link href="/" className="inline-block transition-opacity duration-400 hover:opacity-70">
                 <Image
-                  src="/footer-logo.jpeg"
+                  src="/footer-logo.webp"
                   alt={siteName}
                   width={500}
                   height={500}

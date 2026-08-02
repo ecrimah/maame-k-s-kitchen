@@ -3,8 +3,25 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { escapeHtml } from '@/lib/sanitize';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'missing_api_key');
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'hello@maamekskitchen.ca';
-const EMAIL_FROM = process.env.EMAIL_FROM || "Maame K’s Kitchen <noreply@maamekskitchen.ca>";
+
+/** Comma-separated ADMIN_EMAIL supported (e.g. "a@x.com,b@y.com"). */
+function adminRecipients(): string[] {
+    const raw = process.env.ADMIN_EMAIL || 'hello@maamekskitchen.ca';
+    return raw
+        .split(',')
+        .map((e) => e.trim().replace(/^["']|["']$/g, ''))
+        .filter(Boolean);
+}
+
+function emailFromAddress(): string {
+    const raw = (process.env.EMAIL_FROM || "Maame K’s Kitchen <noreply@maamekskitchen.ca>")
+        .trim()
+        .replace(/^["']|["']$/g, '');
+    if (raw.includes('<') && raw.includes('>')) return raw;
+    if (raw.includes('@')) return `Maame K’s Kitchen <${raw}>`;
+    return "Maame K’s Kitchen <noreply@maamekskitchen.ca>";
+}
+
 const BRAND = {
     name: "Maame K’s Kitchen",
     color: '#059669',
@@ -89,19 +106,94 @@ export async function sendEmail({ to, subject, html }: { to: string; subject: st
         console.warn('[Email] RESEND_API_KEY not configured');
         return null;
     }
+    const recipients = (Array.isArray(to) ? to : [to])
+        .flatMap((entry) => String(entry).split(','))
+        .map((e) => e.trim())
+        .filter(Boolean);
+    if (recipients.length === 0) {
+        console.warn('[Email] No recipients');
+        return null;
+    }
     try {
-        const data = await resend.emails.send({
-            from: EMAIL_FROM,
-            to,
+        const { data, error } = await resend.emails.send({
+            from: emailFromAddress(),
+            to: recipients,
             subject,
             html,
         });
-        console.log('[Email] Sent successfully to:', to.split('@')[0] + '@***');
+        if (error) {
+            console.error('[Email] Resend error:', error.message || JSON.stringify(error));
+            return null;
+        }
+        console.log(
+            '[Email] Sent successfully to:',
+            recipients.map((r) => r.split('@')[0] + '@***').join(', '),
+            'id=',
+            data?.id || 'n/a'
+        );
         return data;
     } catch (error: any) {
         console.error('[Email] Failed:', error.message);
         return null;
     }
+}
+
+function orderCustomerName(order: any): string {
+    const shipping_address = order?.shipping_address;
+    const metadata = order?.metadata;
+    if (shipping_address?.full_name) return shipping_address.full_name;
+    if (shipping_address?.firstName) {
+        return shipping_address.lastName
+            ? `${shipping_address.firstName} ${shipping_address.lastName}`
+            : shipping_address.firstName;
+    }
+    if (metadata?.first_name) {
+        return metadata.last_name
+            ? `${metadata.first_name} ${metadata.last_name}`
+            : metadata.first_name;
+    }
+    return 'Customer';
+}
+
+/**
+ * Admin-only alert when an order is placed (including Stripe before payment).
+ * Customer confirmation is sent separately after payment / COD finalize.
+ */
+export async function sendAdminNewOrderAlert(order: any) {
+    const { id, email, total, created_at, order_number, payment_status, status } = order || {};
+    if (!order_number && !id) {
+        console.warn('[Notification] Admin alert skipped — missing order id');
+        return;
+    }
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    const name = orderCustomerName(order);
+    const payLabel = payment_status || status || 'pending';
+    const admins = adminRecipients();
+    if (admins.length === 0) {
+        console.warn('[Notification] ADMIN_EMAIL not set — skipping admin alert');
+        return;
+    }
+
+    const html = emailLayout(`
+<h2 style="margin:0 0 16px;color:#111827;font-size:20px;">New Order Received</h2>
+<p style="color:#6b7280;font-size:14px;margin:0 0 16px;">Payment status: <strong style="color:#111827;">${escapeHtml(String(payLabel))}</strong></p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border-radius:12px;overflow:hidden;margin:16px 0;">
+  ${emailInfoRow('Order', `#${order_number || id}`)}
+  ${emailInfoRow('Customer', escapeHtml(name))}
+  ${emailInfoRow('Email', escapeHtml(email || '—'))}
+  ${emailInfoRow('Total', `$${Number(total || 0).toFixed(2)}`)}
+  ${created_at ? emailInfoRow('Placed', new Date(created_at).toLocaleString('en-CA', { timeZone: 'America/Edmonton' })) : ''}
+</table>
+
+${emailButton('View Order in Admin', `${baseUrl}/admin/orders/${id || ''}`)}
+`, `New order #${order_number || id} from ${name}`);
+
+    await sendEmail({
+        to: admins.join(','),
+        subject: `New Order #${order_number || id} (${payLabel})`,
+        html,
+    });
 }
 
 // E.164 phone formatting.
@@ -179,25 +271,7 @@ export async function sendOrderConfirmation(order: any) {
     const { id, email, phone: orderPhone, shipping_address, total, created_at, order_number, metadata } = order;
 
     const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
-
-    // Build customer name from available sources
-    const getName = () => {
-        // Try shipping_address first
-        if (shipping_address?.full_name) return shipping_address.full_name;
-        if (shipping_address?.firstName) {
-            return shipping_address.lastName
-                ? `${shipping_address.firstName} ${shipping_address.lastName}`
-                : shipping_address.firstName;
-        }
-        // Fall back to metadata
-        if (metadata?.first_name) {
-            return metadata.last_name
-                ? `${metadata.first_name} ${metadata.last_name}`
-                : metadata.first_name;
-        }
-        return 'Customer';
-    };
-    const name = getName();
+    const name = orderCustomerName(order);
 
     // Prefer top-level phone, then shipping address phone
     const phone = orderPhone || shipping_address?.phone;
@@ -279,8 +353,8 @@ ${emailButton('View Order in Admin', `${baseUrl}/admin/orders/${id}`)}
 `, `New order #${order_number} from ${name}`);
 
     await sendEmail({
-        to: ADMIN_EMAIL,
-        subject: `New Order #${order_number || id}`,
+        to: adminRecipients().join(','),
+        subject: `Order Paid #${order_number || id}`,
         html: adminEmailHtml
     });
 
@@ -530,7 +604,7 @@ export async function sendContactMessage(data: { name: string, email: string, su
 
     // 2. Alert Admin
     await sendEmail({
-        to: ADMIN_EMAIL,
+        to: adminRecipients().join(','),
         subject: `Contact: ${subject}`,
         html: emailLayout(`
 <h2 style="margin:0 0 16px;color:#111827;font-size:20px;">&#128233; New Contact Message</h2>

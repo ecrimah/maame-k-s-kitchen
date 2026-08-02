@@ -48,7 +48,7 @@ export default function AboutPage() {
         {/* Glows */}
         {/* Hero background photo */}
         <Image
-          src="/home_hero_1.jpeg"
+          src="/home_hero_1.webp"
           alt="Maame K kitchen"
           fill
           sizes="100vw"
@@ -95,7 +95,7 @@ export default function AboutPage() {
           <div className="relative group order-2 lg:order-1">
             <div className="aspect-[4/3] rounded-3xl overflow-hidden bg-[#fdf9ec] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] transition-transform duration-700 group-hover:scale-[1.01]">
               <Image
-                src="/about-me.jpeg"
+                src="/about-me.webp"
                 alt={`${siteName} kitchen`}
                 fill
                 sizes="(min-width: 1024px) 560px, 90vw"

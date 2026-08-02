@@ -102,7 +102,7 @@ export default function ContactPage() {
       <PageHero
         title="Get In Touch"
         subtitle="Questions, catering enquiries, or special requests — we would love to hear from you."
-        backgroundImage="/home_hero_1.jpeg"
+        backgroundImage="/home_hero_1.webp"
       />
 
       {/* ── Quick contact strip ── */}

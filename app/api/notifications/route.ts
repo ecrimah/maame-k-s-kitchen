@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { verifyAuth } from '@/lib/auth';
 import { escapeHtml } from '@/lib/sanitize';
-import { sendOrderConfirmation, sendOrderStatusUpdate, sendWelcomeMessage, sendContactMessage, sendPaymentLink, sendEmail, sendSMS, emailLayout } from '@/lib/notifications';
+import { sendOrderConfirmation, sendAdminNewOrderAlert, sendOrderStatusUpdate, sendWelcomeMessage, sendContactMessage, sendPaymentLink, sendEmail, sendSMS, emailLayout } from '@/lib/notifications';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
@@ -56,14 +56,28 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Missing order identifier' }, { status: 400 });
             }
 
-            const orderRef = payload.order_number || payload.id;
-            const { data: order, error: orderError } = await supabaseAdmin
-                .from('orders')
-                .select('id, order_number, created_at')
-                .or(`order_number.eq.${orderRef},id.eq.${orderRef}`)
-                .single();
+            const orderNumber = payload.order_number;
+            const orderId = payload.id;
 
-            if (orderError || !order) {
+            let order: { id: string; order_number: string; created_at: string } | null = null;
+            if (orderNumber) {
+                const byNumber = await supabaseAdmin
+                    .from('orders')
+                    .select('id, order_number, created_at')
+                    .eq('order_number', orderNumber)
+                    .maybeSingle();
+                order = byNumber.data;
+            }
+            if (!order && orderId) {
+                const byId = await supabaseAdmin
+                    .from('orders')
+                    .select('id, order_number, created_at')
+                    .eq('id', orderId)
+                    .maybeSingle();
+                order = byId.data;
+            }
+
+            if (!order) {
                 return NextResponse.json({ error: 'Order not found' }, { status: 404 });
             }
 
@@ -73,7 +87,16 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Order confirmation can only be sent for recent orders' }, { status: 400 });
             }
 
-            await sendOrderConfirmation(payload);
+            const merged = { ...payload, id: order.id, order_number: order.order_number };
+            const paymentStatus = String(merged.payment_status || '').toLowerCase();
+            // Stripe unpaid: admin alert only (customer email after webhook payment).
+            // Paid / COD: full customer + admin confirmation.
+            if (paymentStatus && paymentStatus !== 'paid') {
+                await sendAdminNewOrderAlert(merged);
+                return NextResponse.json({ success: true, message: 'Admin order alert sent' });
+            }
+
+            await sendOrderConfirmation(merged);
             return NextResponse.json({ success: true, message: 'Order confirmation sent' });
         }
 

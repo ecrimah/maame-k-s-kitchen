@@ -112,6 +112,10 @@ Migrations live in `supabase/migrations/`:
 | `20260604000000_preorder_events_categories.sql` | Events/preorder |
 | `20260605000000_meal_prep_subscriptions.sql` | Stripe meal-prep tables |
 | `20260705000000_proteins.sql` | Protein add-ons |
+| `20260802000000_staging_db_hardening.sql` | contact/newsletter/payment_events/sms + RPCs |
+| `20260802130000_store_role_bypassrls.sql` | `ALTER ROLE store_maameks BYPASSRLS` (required) |
+
+**Critical:** leftover Supabase RLS on `auth.users` / `profiles` returns **zero rows** to the store role unless `BYPASSRLS` is granted. App ACL lives in Next.js, not Postgres RLS.
 
 Apply via `npm run db:migrate` (uses `scripts/run-migration.mjs` + `DATABASE_URL`) or direct psql on VPS.
 
@@ -172,24 +176,32 @@ Local disk under `STORAGE_ROOT`. Buckets mirror Supabase bucket names (e.g. `pro
 
 ## Cutover Procedure
 
-### Phase 1 — Staging on VPS (current)
+### Phase 1 — Staging / production on VPS
 
 - [x] Branch `staging/plain-postgres` with compat layer
-- [x] Database `store_maameks` restored from dump
-- [x] REST ACL + repair pass applied
-- [ ] **Coolify app created** (manual — owner UI)
-- [ ] Env vars wired in Coolify
-- [ ] Storage files copied to `STORAGE_ROOT`
-- [ ] Stripe webhook URL updated to VPS domain
-- [ ] Smoke test via `/api/health`
+- [x] Database `store_maameks` restored from live dump + hardening
+- [x] REST ACL + `store_maameks BYPASSRLS`
+- [x] Env at `/data/fleet/secrets/maameks_coolify.env`
+- [x] Storage root `/data/maameks/storage`
+- [x] Coolify app `maameks-app` (`7pu9ayfz316bixojsuqvs2ex`) — nixpacks, port 3000
+  - Branch: `staging/plain-postgres`
+  - Domains: `maamekskitchen.ca`, `www`, `maameks.169-58-8-203.sslip.io`
+  - Storage volume: `/data/maameks/storage`
+  - `DATABASE_URL` host: `fleet-postgres:5432` (not pgbouncer — IPv6 refuse from app net)
+  - Redeploy: `sudo fleet deploy maameks-app`
+- [x] DNS apex + www → `169.58.8.203`
+- [x] `/api/health` OK (DB + Stripe + auth secret)
+- [ ] Stripe Dashboard webhook → `https://maamekskitchen.ca/api/payment/stripe/webhook`
+- [ ] Moolre SMS keys (health shows `sms: missing` until set)
+- [ ] Copy historical Supabase Storage objects into `/data/maameks/storage` if needed
 
-### Phase 2 — DNS cutover
+### Phase 2 — Go-live checklist
 
-1. Deploy Coolify app; confirm health check passes.
-2. Update Stripe webhook endpoint to production URL.
-3. Point `maamekskitchen.ca` DNS to VPS.
-4. Set `NEXT_PUBLIC_APP_URL` and `STORAGE_PUBLIC_URL` to production domain.
-5. Verify Checkout end-to-end (test mode first, then live).
+1. Confirm `https://maamekskitchen.ca/api/health` returns `"db":"ok"`.
+2. Admin login at `/admin/login` (profile `role=admin`).
+3. Register Stripe webhook endpoint + paste `STRIPE_WEBHOOK_SECRET` into env, recreate container.
+4. Place a small live/test Checkout order and confirm `payment_events` + order paid.
+5. Optionally promote the same config into a Coolify-managed app for `sudo fleet deploy`.
 
 ### Phase 3 — Decommission hosted Supabase
 

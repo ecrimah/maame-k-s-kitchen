@@ -115,7 +115,7 @@ export default function EventsPage() {
       <PageHero
         title="Events & Experiences"
         subtitle="The Chop Bar Experience, catering highlights, and community gatherings — dine in, take out, connect."
-        backgroundImage="/events_hero.jpeg"
+        backgroundImage="/events_hero.webp"
         badge="Chop Bar & Catering"
       />
 

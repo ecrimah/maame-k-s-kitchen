@@ -60,7 +60,7 @@ export default async function CategoriesPage() {
       <PageHero
         title="Our Menu"
         subtitle="Rice dishes, soups & stews, grills, sides, drinks and more — all made fresh daily from authentic Ghanaian recipes"
-        backgroundImage="/home_hero_2.jpeg"
+        backgroundImage="/home_hero_2.webp"
       />
 
       {/* ── Quick info strip ── */}

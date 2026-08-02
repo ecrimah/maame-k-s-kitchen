@@ -359,6 +359,16 @@ export default function CheckoutPage() {
             throw new Error(paymentResult.message || 'Payment initialization failed');
           }
 
+          // Alert admin immediately — Stripe path used to return before any email fired.
+          fetch('/api/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'order_created',
+              payload: { ...order, payment_status: order.payment_status || 'pending' },
+            }),
+          }).catch((err) => console.error('Admin order alert error:', err));
+
           saveAppliedCouponToSession(null);
           clearCart();
           window.location.href = paymentResult.url;
