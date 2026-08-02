@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createStorageClient } from "@/lib/db/storage";
 import { isPlainPostgres } from "@/lib/db/mode";
+import { resolveRestActor } from "@/lib/db/rest-auth";
+import { authorizeStorageWrite } from "@/lib/db/rest-acl";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,6 +18,12 @@ export async function POST(
 ) {
   if (!isPlainPostgres()) {
     return NextResponse.json({ error: "DATABASE_URL not set" }, { status: 503 });
+  }
+
+  const actor = await resolveRestActor(req);
+  const decision = authorizeStorageWrite(actor);
+  if (!decision.allow) {
+    return NextResponse.json({ error: decision.message }, { status: decision.status });
   }
 
   const { bucket, path } = await ctx.params;
@@ -51,6 +59,13 @@ export async function DELETE(
   if (!isPlainPostgres()) {
     return NextResponse.json({ error: "DATABASE_URL not set" }, { status: 503 });
   }
+
+  const actor = await resolveRestActor(req);
+  const decision = authorizeStorageWrite(actor);
+  if (!decision.allow) {
+    return NextResponse.json({ error: decision.message }, { status: decision.status });
+  }
+
   const { bucket, path } = await ctx.params;
   const objectPath = path.map(decodeURIComponent).join("/");
   const storage = createStorageClient();

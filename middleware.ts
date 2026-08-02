@@ -5,7 +5,10 @@ import { jwtVerify } from 'jose';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const usePlainPg = process.env.NEXT_PUBLIC_USE_PLAIN_PG === 'true';
+const usePlainPg =
+  process.env.NEXT_PUBLIC_USE_PLAIN_PG === 'true' ||
+  !!process.env.DATABASE_URL ||
+  !!process.env.POSTGRES_URL;
 
 function extractToken(request: NextRequest): string | undefined {
   let token = request.cookies.get('sb-access-token')?.value;

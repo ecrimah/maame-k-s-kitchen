@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { escapeHtml } from '@/lib/sanitize';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 'missing_api_key');
@@ -134,6 +134,8 @@ export async function sendSMS({ to, message }: { to: string; message: string }) 
 
     try {
         console.log(`[SMS] Sending to ${maskPhone(recipient)} from "${senderId}"`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15_000);
         const response = await fetch('https://api.moolre.com/open/sms/send', {
             method: 'POST',
             headers: {
@@ -149,8 +151,10 @@ export async function sendSMS({ to, message }: { to: string; message: string }) 
                         message: message
                     }
                 ]
-            })
+            }),
+            signal: controller.signal,
         });
+        clearTimeout(timeout);
 
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('application/json')) {
@@ -207,7 +211,7 @@ export async function sendOrderConfirmation(order: any) {
     // Fetch order items to get preorder_shipping info
     let shippingNotes: string[] = [];
     try {
-        const { data: items } = await supabase
+        const { data: items } = await supabaseAdmin
             .from('order_items')
             .select('product_name, metadata')
             .eq('order_id', id);

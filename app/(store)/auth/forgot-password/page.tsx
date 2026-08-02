@@ -35,10 +35,29 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/login`,
+      });
+      if (resetError) {
+        console.error('[forgot-password]', resetError.message);
+        const msg = (resetError.message || '').toLowerCase();
+        if (msg.includes('not configured') || msg.includes('not implemented') || msg.includes('501')) {
+          setError(
+            'Password reset email is not available yet. Please contact the restaurant to reset your password.'
+          );
+          return;
+        }
+      }
+      // Generic success avoids email enumeration when the provider accepts the request.
       setIsSubmitted(true);
-    }, 1500);
+    } catch (err) {
+      console.error('[forgot-password]', err);
+      setError('Unable to start password reset. Please try again or contact support.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {

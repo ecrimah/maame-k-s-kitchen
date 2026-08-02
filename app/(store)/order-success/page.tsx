@@ -12,8 +12,28 @@ function OrderSuccessContent() {
   const sessionId = searchParams.get('session_id');
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showConfetti, setShowConfetti] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [confettiPieces, setConfettiPieces] = useState<
+    Array<{ left: number; top: number; delay: number; duration: number; icon: string; color: string }>
+  >([]);
+
+  useEffect(() => {
+    if (!showConfetti) return;
+
+    const icons = ['heart', 'star', 'gift'];
+    const colors = ['blue', 'amber', 'blue'];
+    setConfettiPieces(
+      Array.from({ length: 50 }, () => ({
+        left: Math.random() * 100,
+        top: -(Math.random() * 20),
+        delay: Math.random() * 3,
+        duration: 3 + Math.random() * 2,
+        icon: icons[Math.floor(Math.random() * icons.length)],
+        color: colors[Math.floor(Math.random() * colors.length)],
+      }))
+    );
+  }, [showConfetti]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -35,6 +55,9 @@ function OrderSuccessContent() {
 
         if (error) throw error;
         setOrder(orderData);
+        if (orderData.payment_status === 'paid') {
+          setShowConfetti(true);
+        }
 
         // If redirected from Stripe and order is still pending, verify payment
         if (sessionId && orderData && orderData.payment_status !== 'paid') {
@@ -64,6 +87,7 @@ function OrderSuccessContent() {
     
     if (refreshed?.payment_status === 'paid') {
       setOrder(refreshed);
+      setShowConfetti(true);
       setVerifying(false);
       return;
     }
@@ -84,7 +108,10 @@ function OrderSuccessContent() {
           .select('*, order_items (*)')
           .eq('order_number', orderNum)
           .single();
-        if (updated) setOrder(updated);
+        if (updated) {
+          setOrder(updated);
+          setShowConfetti(true);
+        }
       }
     } catch (err) {
       console.error('Payment verification failed:', err);
@@ -120,6 +147,7 @@ function OrderSuccessContent() {
     );
   }
 
+  const isPaid = order.payment_status === 'paid';
   const orderDate = new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const scheduledDateRaw = order.estimated_delivery_at || (order.metadata?.preferred_date ? order.metadata.preferred_date + 'T12:00:00' : null);
   const estimatedDelivery = scheduledDateRaw
@@ -130,20 +158,20 @@ function OrderSuccessContent() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-[#0d0d0d]">
-      {showConfetti && (
+      {showConfetti && confettiPieces.length > 0 && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-          {[...Array(50)].map((_, i) => (
+          {confettiPieces.map((piece, i) => (
             <div
               key={i}
               className="absolute animate-fall"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `-${Math.random() * 20}%`,
-                animationDelay: `${Math.random() * 3}s`,
-                animationDuration: `${3 + Math.random() * 2}s`
+                left: `${piece.left}%`,
+                top: `${piece.top}%`,
+                animationDelay: `${piece.delay}s`,
+                animationDuration: `${piece.duration}s`
               }}
             >
-              <i className={`ri-${['heart', 'star', 'gift'][Math.floor(Math.random() * 3)]}-fill text-${['blue', 'amber', 'blue'][Math.floor(Math.random() * 3)]}-500 text-xl opacity-70`}></i>
+              <i className={`ri-${piece.icon}-fill text-${piece.color}-500 text-xl opacity-70`}></i>
             </div>
           ))}
         </div>
@@ -151,14 +179,27 @@ function OrderSuccessContent() {
 
       <section className="py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          {verifying && (
+            <div className="mb-6 bg-[#fdf9ec] border border-[#e8c87a] rounded-xl p-4 flex items-center justify-center gap-3">
+              <i className="ri-loader-4-line text-xl text-[#C8952A] animate-spin"></i>
+              <p className="text-sm font-semibold text-[#7a5418]">Confirming payment…</p>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 text-center mb-8">
             <div className="w-24 h-24 flex items-center justify-center mx-auto mb-6 bg-[#fdf9ec] rounded-full">
-              <i className="ri-checkbox-circle-fill text-6xl text-[#C8952A]"></i>
+              <i className={`${isPaid ? 'ri-checkbox-circle-fill text-[#C8952A]' : verifying ? 'ri-loader-4-line text-[#C8952A] animate-spin' : 'ri-time-line text-[#a07020]'} text-6xl`}></i>
             </div>
 
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Order Confirmed!</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              {isPaid ? 'Order Confirmed!' : verifying ? 'Confirming payment…' : 'Payment pending'}
+            </h1>
             <p className="text-xl text-gray-600 mb-8">
-              Thank you for your purchase. We're processing your order now.
+              {isPaid
+                ? "Thank you for your purchase. We're processing your order now."
+                : verifying
+                  ? 'Please wait while we confirm your payment with Stripe.'
+                  : 'Your order is saved, but payment has not been confirmed yet.'}
             </p>
 
             <div className="bg-[#fdf9ec] rounded-xl p-6 mb-8">
@@ -207,7 +248,7 @@ function OrderSuccessContent() {
                   </div>
                 </div>
                 <Link
-                  href="/register"
+                  href="/auth/signup"
                   className="bg-[#C8952A] hover:bg-[#111111] text-white px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
                 >
                   Join Now
@@ -256,7 +297,7 @@ function OrderSuccessContent() {
                 </div>
 
                 <div className="flex justify-between text-xl font-bold text-gray-900 border-t border-gray-200 pt-2">
-                  <span>Total Paid</span>
+                  <span>{isPaid ? 'Total Paid' : 'Order Total'}</span>
                   <span>${order.total.toFixed(2)}</span>
                 </div>
               </div>
@@ -327,7 +368,7 @@ function OrderSuccessContent() {
                 <i className="ri-customer-service-line mr-1"></i>
                 Contact Support
               </Link>
-              <Link href="/account/orders" className="text-[#C8952A] hover:text-[#7a5418] font-semibold whitespace-nowrap">
+              <Link href="/account?tab=orders" className="text-[#C8952A] hover:text-[#7a5418] font-semibold whitespace-nowrap">
                 <i className="ri-question-line mr-1"></i>
                 Order Help
               </Link>

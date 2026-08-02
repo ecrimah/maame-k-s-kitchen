@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://maamekskitchen.ca';
 
@@ -28,12 +28,8 @@ export const metadata: Metadata = {
 type CategoryGroup = { name: string; slug: string; items: { name: string; description: string | null; price: number | null; slug: string; image: string | null }[] };
 
 async function getMenuData(): Promise<CategoryGroup[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return [];
   try {
-    const supabase = createClient(url, key);
-    const { data: products } = await supabase
+    const { data: products } = await supabaseAdmin
       .from('products')
       .select('name, description, price, slug, category_id, product_images(url), categories(name, slug)')
       .eq('status', 'active')

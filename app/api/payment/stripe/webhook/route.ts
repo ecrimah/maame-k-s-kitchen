@@ -57,7 +57,7 @@ export async function POST(req: Request) {
 
       const { data: order } = await supabaseAdmin
         .from('orders')
-        .select('payment_status')
+        .select('payment_status, total')
         .eq('order_number', orderNumber)
         .maybeSingle();
 
@@ -68,6 +68,21 @@ export async function POST(req: Request) {
       if (session.payment_status !== 'paid') {
         console.warn('[Stripe Webhook] Session completed but payment_status is not paid:', session.id);
         return NextResponse.json({ received: true });
+      }
+
+      if (order?.total != null && session.amount_total != null) {
+        const expectedAmount = Math.round(Number(order.total) * 100);
+        if (session.amount_total !== expectedAmount) {
+          console.error(
+            '[Stripe Webhook] Amount mismatch for',
+            orderNumber,
+            'expected',
+            expectedAmount,
+            'got',
+            session.amount_total
+          );
+          return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 });
+        }
       }
 
       const paymentRef =

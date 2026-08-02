@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
 };
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import PageHero from '@/components/PageHero';
 
 export const revalidate = 0;
@@ -40,7 +40,7 @@ const DEFAULT_DESCRIPTIONS: Record<string, string> = {
 };
 
 export default async function CategoriesPage() {
-  const { data: categoriesData } = await supabase
+  const { data: categoriesData } = await supabaseAdmin
     .from('categories')
     .select('id, name, slug, description, image_url, position')
     .eq('status', 'active')

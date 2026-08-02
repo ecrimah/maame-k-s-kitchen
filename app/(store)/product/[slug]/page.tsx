@@ -1,16 +1,12 @@
 import { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import ProductDetailClient from './ProductDetailClient';
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://example.com';
 
 async function getProductMeta(slug: string) {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const { data } = await supabase
+    const { data } = await supabaseAdmin
       .from('products')
       .select('id, name, description, price, sku, status, product_images(url), categories(name)')
       .eq('slug', slug)

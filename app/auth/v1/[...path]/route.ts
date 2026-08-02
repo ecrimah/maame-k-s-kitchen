@@ -146,8 +146,14 @@ export async function POST(
   }
 
   if (slug === "recover") {
-    // Password recovery email not wired in staging shim yet
-    return NextResponse.json({}, { status: 200, headers: cors() });
+    // Do not claim success silently — recovery email is not implemented in plain-PG yet.
+    // Return a clear error so the UI / logs can surface the gap.
+    console.warn("[auth/v1/recover] Password recovery email is not wired for plain Postgres");
+    return gotrueError(
+      "Password recovery email is not configured. Contact support to reset your password.",
+      501,
+      "not_implemented"
+    );
   }
 
   return gotrueError(`Unknown auth path: ${slug}`, 404);
