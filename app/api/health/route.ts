@@ -26,11 +26,30 @@ export async function GET() {
   };
 
   let db: 'ok' | 'error' | 'skipped' = 'skipped';
+  const requiredTables: Record<string, string> = {};
   if (isPlainPostgres()) {
     try {
       const { query } = await import('@/lib/db/pool');
       await query('SELECT 1 AS ok');
       db = 'ok';
+      const needed = [
+        'orders',
+        'order_items',
+        'products',
+        'profiles',
+        'contact_submissions',
+        'newsletter_subscribers',
+        'payment_events',
+        'sms_messages',
+      ];
+      for (const table of needed) {
+        const { rows } = await query<{ exists: boolean }>(
+          `SELECT to_regclass($1) IS NOT NULL AS exists`,
+          [`public.${table}`]
+        );
+        requiredTables[table] = rows[0]?.exists ? 'present' : 'missing';
+        if (!rows[0]?.exists) db = 'error';
+      }
     } catch {
       db = 'error';
     }
@@ -42,6 +61,7 @@ export async function GET() {
       status: healthy ? 'ok' : 'degraded',
       db,
       checks,
+      requiredTables,
       timestamp: new Date().toISOString(),
     },
     { status: healthy ? 200 : 503 }
