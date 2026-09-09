@@ -3,7 +3,7 @@ import { verifyAuth } from '@/lib/auth';
 import { checkRateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getAppBaseUrl, getStripe } from '@/lib/stripe';
-import { getOrCreateStripeCustomer } from '@/lib/stripe-meal-prep';
+import { ensureStripePlanPrice, getOrCreateStripeCustomer } from '@/lib/stripe-meal-prep';
 
 export async function POST(req: Request) {
   try {
@@ -50,14 +50,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, message: 'Plan not found' }, { status: 404 });
     }
 
-    if (!plan.stripe_price_id) {
-      return NextResponse.json(
-        { success: false, message: 'This plan is not available for checkout yet. Please try again later.' },
-        { status: 400 }
-      );
+    let stripe_price_id = plan.stripe_price_id as string | null;
+    if (!stripe_price_id) {
+      try {
+        const synced = await ensureStripePlanPrice(plan);
+        stripe_price_id = synced.stripe_price_id;
+      } catch (syncErr: unknown) {
+        const message = syncErr instanceof Error ? syncErr.message : 'Stripe sync failed';
+        console.error('[subscriptions/create-checkout] Stripe plan sync failed:', message);
+        return NextResponse.json(
+          { success: false, message: 'This plan is not available for checkout yet. Please try again later.' },
+          { status: 400 }
+        );
+      }
     }
-
-    const stripe_price_id = plan.stripe_price_id;
     const customerId = await getOrCreateStripeCustomer(
       auth.user.id,
       auth.user.email || '',
